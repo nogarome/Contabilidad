@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contabilidad Doméstica</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        input, select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+        }
+        .transaction-list {
+            margin-top: 20px;
+        }
+        .transaction-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin: 5px 0;
+            background-color: white;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .ingreso { 
+            color: #28a745 !important;
+            font-weight: bold;
+        }
+        .gasto { 
+            color: #dc3545 !important;
+            font-weight: bold;
+        }
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 20px;
+            padding: 15px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        button { 
+            margin-left: 5%px;
+            padding: 8px 8px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .error { 
+            color: #dc3545;
+            margin-top: 10px;
+        }
+        #total-income { color: #28a745; }
+        #total-expense { color: #dc3545; }
+        #balance {
+            font-weight: bold;
+            color: #28a745;            
+        }
+        .combo-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        #custom-description {
+            display: none;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>📊 Contabilidad Doméstica</h1>
+    
+    <div class="form-group">
+        <label for="description">Descripción:</label>
+        <div class="combo-container">
+            <select id="description" required onchange="toggleCustomDescription()">
+                <option value="">-- Seleccione --</option>
+                <option value="Recibido">Recibido</option>
+                <option value="Entregado">Entregado</option>                
+                <option value="Otros">Otros</option>
+            </select>
+            <input type="text" id="custom-description" placeholder="Otra descripción">
+        </div>
+    </div>
+    
+    <div class="form-group">
+        <label for="amount">Euros:</label>
+        <input type="number" id="amount" step="10" required>
+    </div>
+    
+    <div class="form-group">
+        <label for="type">Tipo:</label>
+        <select id="type" onchange="updateCategories()">
+            <option value="ingreso">Ingreso</option>
+            <option value="gasto">Gasto</option>
+        </select>
+    </div>
+    
+    <div class="form-group">
+        <label for="category">Categoría:</label>
+        <select id="category"></select>
+    </div>
+    
+    <div class="form-group">
+        <label for="date">Fecha:</label>
+        <input type="date" id="date" required>
+    </div>
+    
+    <button onclick="addTransaction()">➕ Agregar Transacción</button>
+    <div id="error-message" class="error"></div>
+    
+    <div class="summary">
+        <div>Ingresos: <br><span id="total-income">0</span></div>        
+        <div>Gastos: <br><span id="total-expense">0</span></div>
+        <div>Balance: <br><span id="balance">0</span></div>
+    </div>
+    
+    <h2>📋 Historial de Transacciones</h2>
+    <div class="transaction-list" id="transactions"></div>
+
+    <script>
+        let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+
+        function toggleCustomDescription() {
+            const descSelect = document.getElementById('description');
+            const customDesc = document.getElementById('custom-description');
+            customDesc.style.display = (descSelect.value === 'Otros') ? 'block' : 'none';
+            if (descSelect.value !== 'Otros') customDesc.value = '';
+        }
+        
+        const categories = {
+            ingreso: ['Piso', 'Garaje', 'Luz', 'Otros'],
+            gasto: ['Papa', 'Mamá', 'Otros']
+        };
+
+        function updateCategories() {
+            const type = document.getElementById('type').value;
+            const categorySelect = document.getElementById('category');
+            categorySelect.innerHTML = '';
+            categories[type].forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat;
+                option.textContent = cat;
+                categorySelect.appendChild(option);
+            });
+        }
+
+        function saveData() {
+            localStorage.setItem('transactions', JSON.stringify(transactions));
+            updateDisplay();
+        }
+
+        function addTransaction() {
+            const descSelect = document.getElementById('description');
+            const customDesc = document.getElementById('custom-description');
+            let description = descSelect.value;
+            
+            if (description === 'Otros') {
+                description = customDesc.value.trim();
+                if (!description) {
+                    showError('⚠️ Por favor ingrese una descripción');
+                    return;
+                }
+            }
+
+            const amount = parseFloat(document.getElementById('amount').value);
+            const type = document.getElementById('type').value;
+            const category = document.getElementById('category').value;
+            const date = document.getElementById('date').value;
+
+            if (!description || isNaN(amount) || !date) {
+                showError('⚠️ Por favor complete todos los campos correctamente');
+                return;
+            }
+            
+
+            const transaction = {
+                id: Date.now(),
+                description,
+                amount: type === 'gasto' ? -Math.abs(amount) : Math.abs(amount),
+                type,
+                category,
+                date
+            };
+
+            transactions.push(transaction);
+            saveData();
+            clearForm();
+        }
+
+        function deleteTransaction(id) {
+            transactions = transactions.filter(t => t.id !== id);
+            saveData();
+        }
+
+        function updateDisplay() {
+            const transactionsContainer = document.getElementById('transactions');
+            transactionsContainer.innerHTML = '';
+            
+            let totalIncome = 0;
+            let totalExpense = 0;
+
+            transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            transactions.forEach(transaction => {
+                const div = document.createElement('div');
+                div.className = 'transaction-item';
+                div.innerHTML = `
+                    <div style="width: 100px">${transaction.date}</div>
+                    <div style="flex: 2">${transaction.description}</div>
+                    <div style="flex: 1">${transaction.category}</div>
+                    <div class="${transaction.type}" style="flex: 1; text-align: center">${Math.abs(transaction.amount).toFixed(2)}</div>
+                    <button onclick="deleteTransaction(${transaction.id})">🗑️</button>
+                `;
+                transactionsContainer.appendChild(div);
+
+                if (transaction.type === 'ingreso') {
+                    totalIncome += transaction.amount;
+                } else {
+                    totalExpense += Math.abs(transaction.amount);
+                }
+            });
+
+            const balance = totalIncome - totalExpense;
+            
+            document.getElementById('total-income').textContent = totalIncome.toFixed(2);
+            document.getElementById('total-expense').textContent = totalExpense.toFixed(2);
+            document.getElementById('balance').textContent = balance.toFixed(2);
+            
+            // Color dinámico para el balance
+            document.getElementById('balance').style.color = balance >= 0 ? '#28a745' : '#dc3545';
+        }
+
+        function clearForm() {
+            document.getElementById('description').value = '';
+            document.getElementById('amount').value = '';
+            document.getElementById('date').value = '';
+            document.getElementById('error-message').textContent = '';
+        }
+
+        function showError(message) {
+            document.getElementById('error-message').textContent = message;
+            setTimeout(() => {
+                document.getElementById('error-message').textContent = '';
+            }, 3000);
+        }
+
+        // Inicialización
+        updateCategories();
+        updateDisplay();
+    </script>
+</body>
+</html>
