@@ -84,6 +84,17 @@
             display: none;
             margin-top: 5px;
         }
+
+
+        button {
+    margin: 5px;
+    padding: 8px 15px;
+    /* Resto del estilo existente */
+}
+
+input[type="file"] {
+    display: none;
+}
     </style>
 </head>
 <body>
@@ -126,7 +137,7 @@
     </div>
     
     <button onclick="addTransaction()">➕ Agregar Transacción</button>
-    <div id="error-message" class="error"></div>
+    <div id="error-message" class="error"></div>   
     
     <div class="summary">
         <div>Ingresos: <br><span id="total-income">0</span></div>        
@@ -136,6 +147,12 @@
     
     <h2>📋 Historial de Transacciones</h2>
     <div class="transaction-list" id="transactions"></div>
+
+    <div style="margin-top: 20px;">
+        <button onclick="exportToJSON()">💾 Exportar a JSON</button>
+        <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importFromJSON(event)">
+        <button onclick="document.getElementById('importFile').click()">📥 Importar desde JSON</button>
+    </div>
 
     <script>
         let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
@@ -263,6 +280,39 @@
                 document.getElementById('error-message').textContent = '';
             }, 3000);
         }
+
+
+
+        function exportToJSON() {
+    const dataStr = JSON.stringify(transactions, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `transacciones_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function importFromJSON(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const importedData = JSON.parse(e.target.result);
+            transactions = importedData;
+            saveData();
+            updateDisplay();
+        } catch (error) {
+            showError('Error al importar el archivo JSON');
+        }
+    };
+    reader.readAsText(file);
+}
 
         // Inicialización
         updateCategories();
